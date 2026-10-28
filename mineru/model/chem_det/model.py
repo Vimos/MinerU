@@ -11,7 +11,7 @@ class ChemDetModel:
         self,
         weight: str,
         device: str = "cpu",
-        imgsz: int = 1888,
+        imgsz: int = 1280,
         conf: float = 0.7,
         iou: float = 0.45,
     ):
