@@ -126,6 +126,7 @@ class BatchAnalyze:
                         p3, p4 = [int(x1), int(y1)], [int(x0), int(y1)]
                         images_layout_res[image_index].append({
                             'category_id': 17,  # 化学结构
+                            'bbox': [int(x0), int(y0), int(x1), int(y1)],
                             'poly': p1 + p2 + p3 + p4,
                             'score': output['confidence'],
                             'text': output['smiles']
