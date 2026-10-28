@@ -13,7 +13,7 @@ from torchvision import transforms
 
 from .swin_ocsr import SwinOCSRConfig, SwinOCSRModel  # registers with Auto*
 
-_MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
+_MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "swin_ocsr")
 _WORD_MAP = os.path.join(_MODEL_DIR, "500wan_shuffle_DeepSMILES_word_map")
 
 _transform = transforms.Compose([
