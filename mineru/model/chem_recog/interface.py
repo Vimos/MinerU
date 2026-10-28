@@ -54,7 +54,9 @@ class SwinOCSR:
 
     @torch.no_grad()
     def _predict_one(self, img_np):
-        pil = Image.fromarray(img_np).convert("RGB")
+        pil = Image.fromarray(img_np).convert("L")
+        # 模型在二值化图上训练: 灰度阈值 200 -> 黑白
+        pil = pil.point(lambda x: 0 if x < 200 else 255, "1").convert("RGB")
         x = _transform(pil).unsqueeze(0).to(self.device)
         memory = self.model.encoder(x)
         ys = torch.ones(1, 1).fill_(self.start_id).type(torch.long).to(self.device)
