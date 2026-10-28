@@ -39,6 +39,9 @@ def page_model_info_to_page_info(page_model_info, image_dict, page, image_writer
     title_blocks = magic_model.get_title_blocks()
     inline_equations, interline_equations, interline_equation_blocks = magic_model.get_equations()
     chemical_blocks = magic_model.get_chemical() if chem_enabled else []
+    import os as _os2
+    if _os2.getenv("CHEM_DEBUG"):
+        print(f"[CHEMDBG] page {page_index}: chem_enabled={chem_enabled}, get_chemical()={len(chemical_blocks)} blocks")
 
     img_groups = magic_model.get_imgs()
     table_groups = magic_model.get_tables()
