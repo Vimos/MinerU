@@ -26,15 +26,19 @@ def detect_lang(text: str) -> str:
     text = remove_invalid_surrogates(text)
 
     # print(text)
+    lang_upper = ""
     try:
         lang_upper = detect_language(text)
-    except:
+    except Exception:  # noqa: BLE001
         html_no_ctrl_chars = ''.join([l for l in text if unicodedata.category(l)[0] not in ['C', ]])
-        lang_upper = detect_language(html_no_ctrl_chars)
+        try:
+            lang_upper = detect_language(html_no_ctrl_chars)
+        except Exception:  # noqa: BLE001
+            lang_upper = "EN"  # 极端文本(如纯符号/SMILES)无法检测时默认英文
 
     try:
         lang = lang_upper.lower()
-    except:
+    except:  # noqa: BLE001
         lang = ""
     return lang
 
