@@ -1,6 +1,11 @@
 import albumentations as A
-from albumentations.augmentations.geometric.functional import safe_rotate_enlarged_img_size, _maybe_process_in_chunks, \
-                                                              keypoint_rotate
+try:
+    from albumentations.augmentations.geometric.functional import safe_rotate_enlarged_img_size, _maybe_process_in_chunks, \
+                                                                  keypoint_rotate
+except ImportError:  # newer albumentations removed these internals; only needed for training-time SafeRotate
+    safe_rotate_enlarged_img_size = None
+    _maybe_process_in_chunks = None
+    keypoint_rotate = None
 import cv2
 import math
 import random
