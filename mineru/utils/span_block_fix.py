@@ -232,6 +232,9 @@ def fix_block_spans(block_with_spans):
             block = fix_text_block(block)
         elif block_type in [BlockType.INTERLINE_EQUATION, BlockType.IMAGE_BODY, BlockType.TABLE_BODY]:
             block = fix_interline_block(block)
+        elif block_type == BlockType.CHEMICAL:
+            # 化学结构块: 单个 CHEMICAL_FORMULA span(SMILES), 同公式块一样转 lines
+            block = fix_interline_block(block)
         else:
             continue
         fix_blocks.append(block)
