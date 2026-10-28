@@ -52,6 +52,9 @@ def __process_blocks(blocks):
 
 
 def __is_list_or_index_block(block):
+    # 化学结构块: 内容是 SMILES(非自然语言), 不做 list/index 判定, 保持原类型
+    if block.get('type') == BlockType.CHEMICAL:
+        return BlockType.CHEMICAL
     # 一个block如果是list block 应该同时满足以下特征
     # 1.block内有多个line 2.block 内有多个line左侧顶格写 3.block内有多个line 右侧不顶格（狗牙状）
     # 1.block内有多个line 2.block 内有多个line左侧顶格写 3.多个line以endflag结尾
@@ -104,7 +107,7 @@ def __is_list_or_index_block(block):
             lines_text_list.append(line_text)
             block_text = ''.join(lines_text_list)
 
-        block_lang = detect_lang(block_text)
+        block_lang = detect_lang(block_text) if block_text.strip() else 'en'
         # logger.info(f"block_lang: {block_lang}")
 
         for line in block['lines']:
