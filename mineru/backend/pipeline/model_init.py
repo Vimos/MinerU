@@ -1,7 +1,7 @@
 import os
 
 import torch
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download, snapshot_download
 from loguru import logger
 
 from .model_list import AtomicModel
@@ -13,7 +13,7 @@ from mineru.model.ocr.pytorch_paddle import PytorchPaddleOCR
 from ...model.ori_cls.paddle_ori_cls import PaddleOrientationClsModel
 from ...model.table.cls.paddle_table_cls import PaddleTableClsModel
 from ...model.chem_det.model import ChemDetModel
-from ...model.chem_recog.molscribe import MolScribe
+from ...model.chem_recog import SwinOCSR as MolScribe
 # from ...model.table.rec.RapidTable import RapidTableModel
 from ...model.table.rec.slanet_plus.main import RapidTableModel
 from ...model.table.rec.unet_table.main import UnetTableModel
@@ -269,7 +269,7 @@ class MineruPipelineModel:
             )
             self.chem_recog_model = atom_model_manager.get_atom_model(
                 atom_model_name=AtomicModel.ChemRecog,
-                cfr_weight_dir=hf_hub_download('yujieq/MolScribe', 'swin_base_char_aux_1m680k.pth'),
+                cfr_weight_dir=snapshot_download('CAS-SIAT-XinHai/swin-ocsr-large-patch4-window7-224'),
                 device=self.device,
             )
 
