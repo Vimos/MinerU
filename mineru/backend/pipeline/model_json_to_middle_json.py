@@ -39,9 +39,6 @@ def page_model_info_to_page_info(page_model_info, image_dict, page, image_writer
     title_blocks = magic_model.get_title_blocks()
     inline_equations, interline_equations, interline_equation_blocks = magic_model.get_equations()
     chemical_blocks = magic_model.get_chemical() if chem_enabled else []
-    import os as _os2
-    if _os2.getenv("CHEM_DEBUG"):
-        print(f"[CHEMDBG] page {page_index}: chem_enabled={chem_enabled}, get_chemical()={len(chemical_blocks)} blocks")
 
     img_groups = magic_model.get_imgs()
     table_groups = magic_model.get_tables()
@@ -165,21 +162,10 @@ def page_model_info_to_page_info(page_model_info, image_dict, page, image_writer
             )
 
     """span填充进block"""
-    import os as _os
-    _dbg = _os.getenv("CHEM_DEBUG")
-    if _dbg:
-        print(f"[CHEMDBG] before fill: spans chem={sum(1 for s in spans if s.get('type')=='chemical_formula')}, all_bboxes chem={sum(1 for b in all_bboxes if len(b)>7 and b[7]=='chemical')}")
     block_with_spans, spans = fill_spans_in_blocks(all_bboxes, spans, 0.5)
-    if _dbg:
-        print(f"[CHEMDBG] after fill: blocks chem={sum(1 for b in block_with_spans if b.get('type')=='chemical')}")
-        for b in block_with_spans:
-            if b.get('type')=='chemical':
-                print(f"[CHEMDBG]   chem block spans: {[s.get('type') for s in b.get('lines',[{}])[0].get('spans',[])] if b.get('lines') else 'NO-LINES'}")
 
     """对block进行fix操作"""
     fix_blocks = fix_block_spans(block_with_spans)
-    if _dbg:
-        print(f"[CHEMDBG] after fix: blocks chem={sum(1 for b in fix_blocks if b.get('type')=='chemical')}")
 
     """对block进行排序"""
     sorted_blocks = sort_blocks_by_bbox(fix_blocks, page_w, page_h, footnote_blocks)
