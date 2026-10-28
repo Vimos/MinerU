@@ -15,6 +15,7 @@ class BlockType:
     LIST = 'list'
     INDEX = 'index'
     DISCARDED = 'discarded'
+    CHEMICAL = 'chemical'
 
     # Added in vlm 2.5
     CODE = "code"
@@ -38,6 +39,7 @@ class ContentType:
     INLINE_EQUATION = 'inline_equation'
     EQUATION = 'equation'
     CODE = 'code'
+    CHEMICAL_FORMULA = 'chemical_formula'
 
 
 class ContentTypeV2:
@@ -80,6 +82,7 @@ class CategoryId:
     InterlineEquation_YOLO = 14
     OcrText = 15
     LowScoreText = 16
+    ChemicalFormula = 17
     ImageFootnote = 101
 
 

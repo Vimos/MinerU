@@ -176,6 +176,7 @@ def _process_pipeline(
         parse_method,
         p_formula_enable,
         p_table_enable,
+        p_chem_enable,
         f_draw_layout_bbox,
         f_draw_span_bbox,
         f_dump_md,
@@ -192,7 +193,8 @@ def _process_pipeline(
     infer_results, all_image_lists, all_pdf_docs, lang_list, ocr_enabled_list = (
         pipeline_doc_analyze(
             pdf_bytes_list, p_lang_list, parse_method=parse_method,
-            formula_enable=p_formula_enable, table_enable=p_table_enable
+            formula_enable=p_formula_enable, table_enable=p_table_enable,
+            chem_enable=p_chem_enable,
         )
     )
 
@@ -209,7 +211,7 @@ def _process_pipeline(
 
         middle_json = pipeline_result_to_middle_json(
             model_list, images_list, pdf_doc, image_writer,
-            _lang, _ocr_enable, p_formula_enable
+            _lang, _ocr_enable, p_formula_enable, chem_enabled=p_chem_enable
         )
 
         pdf_info = middle_json["pdf_info"]
@@ -420,6 +422,7 @@ def do_parse(
         parse_method="auto",
         formula_enable=True,
         table_enable=True,
+        chem_enable=False,
         server_url=None,
         f_draw_layout_bbox=True,
         f_draw_span_bbox=True,
@@ -439,7 +442,7 @@ def do_parse(
     if backend == "pipeline":
         _process_pipeline(
             output_dir, pdf_file_names, pdf_bytes_list, p_lang_list,
-            parse_method, formula_enable, table_enable,
+            parse_method, formula_enable, table_enable, chem_enable,
             f_draw_layout_bbox, f_draw_span_bbox, f_dump_md, f_dump_middle_json,
             f_dump_model_output, f_dump_orig_pdf, f_dump_content_list, f_make_md_mode
         )
@@ -492,6 +495,7 @@ async def aio_do_parse(
         parse_method="auto",
         formula_enable=True,
         table_enable=True,
+        chem_enable=False,
         server_url=None,
         f_draw_layout_bbox=True,
         f_draw_span_bbox=True,
@@ -512,7 +516,7 @@ async def aio_do_parse(
         # pipeline模式暂不支持异步，使用同步处理方式
         _process_pipeline(
             output_dir, pdf_file_names, pdf_bytes_list, p_lang_list,
-            parse_method, formula_enable, table_enable,
+            parse_method, formula_enable, table_enable, chem_enable,
             f_draw_layout_bbox, f_draw_span_bbox, f_dump_md, f_dump_middle_json,
             f_dump_model_output, f_dump_orig_pdf, f_dump_content_list, f_make_md_mode
         )

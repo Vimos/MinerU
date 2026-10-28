@@ -15,7 +15,7 @@ def make_blocks_to_markdown(paras_of_layout,
     for para_block in paras_of_layout:
         para_text = ''
         para_type = para_block['type']
-        if para_type in [BlockType.TEXT, BlockType.LIST, BlockType.INDEX]:
+        if para_type in [BlockType.TEXT, BlockType.LIST, BlockType.INDEX, BlockType.CHEMICAL]:
             para_text = merge_para_with_text(para_block)
         elif para_type == BlockType.TITLE:
             title_level = get_title_level(para_block)
@@ -130,6 +130,9 @@ def merge_para_with_text(para_block):
             elif span_type == ContentType.INTERLINE_EQUATION:
                 if span.get('content', ''):
                     content = f"\n{display_left_delimiter}\n{span['content']}\n{display_right_delimiter}\n"
+            elif span_type == ContentType.CHEMICAL_FORMULA:
+                if span.get('content', ''):
+                    content = f"<smiles>{span['content']}</smiles>"
 
             content = content.strip()
 
@@ -153,7 +156,7 @@ def merge_para_with_text(para_block):
                         para_text += f'{content} '
                 else:
                     # 西方文本语境下 每行的最后一个span判断是否要去除连字符
-                    if span_type in [ContentType.TEXT, ContentType.INLINE_EQUATION]:
+                    if span_type in [ContentType.TEXT, ContentType.INLINE_EQUATION, ContentType.CHEMICAL_FORMULA]:
                         # 如果span是line的最后一个且末尾带有-连字符，那么末尾不应该加空格,同时应该把-删除
                         if (
                                 is_last_span
@@ -186,6 +189,7 @@ def make_blocks_to_content_list(para_block, img_buket_path, page_idx, page_size)
         BlockType.TEXT,
         BlockType.LIST,
         BlockType.INDEX,
+        BlockType.CHEMICAL,
     ]:
         para_content = {
             'type': ContentType.TEXT,

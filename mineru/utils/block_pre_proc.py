@@ -42,6 +42,7 @@ def prepare_block_bboxes(
     text_blocks,
     title_blocks,
     interline_equation_blocks,
+    chemical_blocks,
     page_w,
     page_h,
 ):
@@ -56,6 +57,7 @@ def prepare_block_bboxes(
     add_bboxes(text_blocks, BlockType.TEXT, all_bboxes)
     add_bboxes(title_blocks, BlockType.TITLE, all_bboxes)
     add_bboxes(interline_equation_blocks, BlockType.INTERLINE_EQUATION, all_bboxes)
+    add_bboxes(chemical_blocks, BlockType.CHEMICAL, all_bboxes)
 
     """block嵌套问题解决"""
     """文本框与标题框重叠，优先信任文本框"""
@@ -234,6 +236,9 @@ def remove_overlaps_min_blocks(all_bboxes):
                     block_to_remove = block2
                     large_block = block1
 
+                # 化学结构块不被合并删除
+                if len(block_to_remove) > 7 and block_to_remove[7] == BlockType.CHEMICAL:
+                    continue
                 if block_to_remove not in need_remove:
                     x1, y1, x2, y2 = large_block[:4]
                     sx1, sy1, sx2, sy2 = block_to_remove[:4]

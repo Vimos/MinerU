@@ -8,7 +8,7 @@ import numpy as np
 
 from .model_init import AtomModelSingleton
 from .model_list import AtomicModel
-from ...utils.config_reader import get_formula_enable, get_table_enable
+from ...utils.config_reader import get_chem_enable, get_formula_enable, get_table_enable
 from ...utils.model_utils import crop_img, get_res_list_from_layout_res, clean_vram
 from ...utils.ocr_utils import merge_det_boxes, update_det_boxes, sorted_boxes
 from ...utils.ocr_utils import get_adjusted_mfdetrec_res, get_ocr_result_list, OcrConfidence, get_rotate_crop_image
@@ -16,6 +16,23 @@ from ...utils.pdf_image_tools import get_crop_np_img
 
 YOLO_LAYOUT_BASE_BATCH_SIZE = 1
 MFD_BASE_BATCH_SIZE = 1
+
+
+def pad_images(images):
+    max_h = max(image.shape[0] for image in images)
+    max_w = max(image.shape[1] for image in images)
+    padded_images = []
+    for image in images:
+        h, w, c = image.shape
+        pad_h = max_h - h
+        pad_w = max_w - w
+        pad_top = pad_h // 2
+        pad_bottom = pad_h - pad_top
+        pad_left = pad_w // 2
+        pad_right = pad_w - pad_left
+        padded_image = np.pad(image, ((pad_top, pad_bottom), (pad_left, pad_right), (0, 0)), mode='constant', constant_values=255)
+        padded_images.append(padded_image)
+    return padded_images
 MFR_BASE_BATCH_SIZE = 16
 OCR_DET_BASE_BATCH_SIZE = 16
 TABLE_ORI_CLS_BATCH_SIZE = 16
@@ -23,10 +40,11 @@ TABLE_Wired_Wireless_CLS_BATCH_SIZE = 16
 
 
 class BatchAnalyze:
-    def __init__(self, model_manager, batch_ratio: int, formula_enable, table_enable, enable_ocr_det_batch: bool = True):
+    def __init__(self, model_manager, batch_ratio: int, formula_enable, table_enable, chem_enable=False, enable_ocr_det_batch: bool = True):
         self.batch_ratio = batch_ratio
         self.formula_enable = get_formula_enable(formula_enable)
         self.table_enable = get_table_enable(table_enable)
+        self.chem_enable = get_chem_enable(chem_enable)
         self.model_manager = model_manager
         self.enable_ocr_det_batch = enable_ocr_det_batch
 
@@ -40,6 +58,7 @@ class BatchAnalyze:
             lang=None,
             formula_enable=self.formula_enable,
             table_enable=self.table_enable,
+            chem_enable=self.chem_enable,
         )
         atom_model_manager = AtomModelSingleton()
 
@@ -69,6 +88,48 @@ class BatchAnalyze:
             for image_index in range(len(np_images)):
                 images_layout_res[image_index] += images_formula_list[image_index]
                 mfr_count += len(images_formula_list[image_index])
+
+        if self.chem_enable:
+            # 化学结构检测
+            all_chem_image_list = []
+            all_chem_coo_list = []
+            images_cfd_res = self.model.chem_det_model.batch_predict(np_images, MFD_BASE_BATCH_SIZE)
+            for i, result in enumerate(images_cfd_res):
+                chem_image_list = []
+                chem_coo_list = []
+                h_img, w_img = np_images[i].shape[:2]
+                bboxes = result.boxes.xyxy.cpu()
+                for box in bboxes:
+                    x0, y0, x1, y1 = map(int, box.tolist())
+                    x0c = max(0, x0 - 5); y0c = max(0, y0 - 5)
+                    x1c = min(w_img, x1 + 5); y1c = min(h_img, y1 + 5)
+                    roi = np_images[i][y0c:y1c, x0c:x1c]
+                    if roi.shape[0] == 0 or roi.shape[1] == 0:
+                        continue
+                    chem_image_list.append(roi)
+                    chem_coo_list.append((x0, y0, x1, y1))
+                all_chem_image_list.append(chem_image_list)
+                all_chem_coo_list.append(chem_coo_list)
+            # 化学结构识别 (MolScribe)
+            for chem_image_list, chem_coo_list, image_index in tqdm(
+                zip(all_chem_image_list, all_chem_coo_list, range(len(np_images))),
+                desc="ChemRec Predict", total=len(np_images)):
+                if len(chem_image_list) == 0:
+                    continue
+                images = pad_images(chem_image_list)
+                chem_res = self.model.chem_recog_model.predict_images(
+                    images, return_atoms_bonds=False, return_confidence=True)
+                for output, coo in zip(chem_res, chem_coo_list):
+                    x0, y0, x1, y1 = coo
+                    if output['confidence'] > 0.7:
+                        p1, p2 = [int(x0), int(y0)], [int(x1), int(y0)]
+                        p3, p4 = [int(x1), int(y1)], [int(x0), int(y1)]
+                        images_layout_res[image_index].append({
+                            'category_id': 17,  # 化学结构
+                            'poly': p1 + p2 + p3 + p4,
+                            'score': output['confidence'],
+                            'text': output['smiles']
+                        })
 
         # 清理显存
         clean_vram(self.model.device, vram_threshold=8)

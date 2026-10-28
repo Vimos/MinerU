@@ -41,7 +41,7 @@ def get_line_height(blocks):
     page_line_height_list = []
     for block in blocks:
         if block['type'] in [
-            BlockType.TEXT, BlockType.TITLE,
+            BlockType.TEXT, BlockType.TITLE, BlockType.CHEMICAL,
             BlockType.IMAGE_CAPTION, BlockType.IMAGE_FOOTNOTE,
             BlockType.TABLE_CAPTION, BlockType.TABLE_FOOTNOTE
         ]:
@@ -66,7 +66,7 @@ def sort_lines_by_model(fix_blocks, page_w, page_h, line_height, footnote_blocks
 
     for block in fix_blocks:
         if block['type'] in [
-            BlockType.TEXT, BlockType.TITLE,
+            BlockType.TEXT, BlockType.TITLE, BlockType.CHEMICAL,
             BlockType.IMAGE_CAPTION, BlockType.IMAGE_FOOTNOTE,
             BlockType.TABLE_CAPTION, BlockType.TABLE_FOOTNOTE
         ]:

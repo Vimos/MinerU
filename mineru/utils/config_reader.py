@@ -113,6 +113,12 @@ def get_formula_enable(formula_enable):
     return formula_enable
 
 
+def get_chem_enable(chem_enable):
+    chem_enable_env = os.getenv('MINERU_CHEM_ENABLE')
+    chem_enable = chem_enable if chem_enable_env is None else chem_enable_env.lower() == 'true'
+    return chem_enable
+
+
 def get_table_enable(table_enable):
     table_enable_env = os.getenv('MINERU_TABLE_ENABLE')
     table_enable = table_enable if table_enable_env is None else table_enable_env.lower() == 'true'

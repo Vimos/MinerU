@@ -18,8 +18,8 @@ def fill_spans_in_blocks(blocks, spans, radio):
         }
         if block_type in [
             BlockType.IMAGE_BODY, BlockType.IMAGE_CAPTION, BlockType.IMAGE_FOOTNOTE,
-            BlockType.TABLE_BODY, BlockType.TABLE_CAPTION, BlockType.TABLE_FOOTNOTE
-        ]:
+            BlockType.TABLE_BODY, BlockType.TABLE_CAPTION, BlockType.TABLE_FOOTNOTE,
+                  BlockType.CHEMICAL        ]:
             block_dict['group_id'] = block[-1]
         block_spans = []
         for span in spans:
@@ -58,6 +58,8 @@ def span_block_type_compatible(span_type, block_type):
         return block_type in [BlockType.IMAGE_BODY]
     elif span_type == ContentType.TABLE:
         return block_type in [BlockType.TABLE_BODY]
+    elif span_type == ContentType.CHEMICAL_FORMULA:
+        return block_type in [BlockType.CHEMICAL]
     else:
         return False
 

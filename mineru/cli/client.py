@@ -125,6 +125,14 @@ from .common import do_parse, read_fn, pdf_suffixes, image_suffixes
     default=True,
 )
 @click.option(
+    '-c',
+    '--chem',
+    'chem_enable',
+    type=bool,
+    help='Enable chemical structure parsing (pipeline backend only). Default is False.',
+    default=False,
+)
+@click.option(
     '-d',
     '--device',
     'device_mode',
@@ -154,7 +162,7 @@ from .common import do_parse, read_fn, pdf_suffixes, image_suffixes
 def main(
         ctx,
         input_path, output_dir, method, backend, lang, server_url,
-        start_page_id, end_page_id, formula_enable, table_enable,
+        start_page_id, end_page_id, formula_enable, table_enable, chem_enable,
         device_mode, virtual_vram, model_source, **kwargs
 ):
 
@@ -202,6 +210,7 @@ def main(
                 parse_method=method,
                 formula_enable=formula_enable,
                 table_enable=table_enable,
+                chem_enable=chem_enable,
                 server_url=server_url,
                 start_page_id=start_page_id,
                 end_page_id=end_page_id,

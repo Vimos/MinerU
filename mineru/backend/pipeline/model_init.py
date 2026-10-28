@@ -1,6 +1,7 @@
 import os
 
 import torch
+from huggingface_hub import hf_hub_download
 from loguru import logger
 
 from .model_list import AtomicModel
@@ -11,6 +12,8 @@ from ...model.mfr.pp_formulanet_plus_m.predict_formula import FormulaRecognizer
 from mineru.model.ocr.pytorch_paddle import PytorchPaddleOCR
 from ...model.ori_cls.paddle_ori_cls import PaddleOrientationClsModel
 from ...model.table.cls.paddle_table_cls import PaddleTableClsModel
+from ...model.chem_det.model import ChemDetModel
+from ...model.chem_recog.molscribe import MolScribe
 # from ...model.table.rec.RapidTable import RapidTableModel
 from ...model.table.rec.slanet_plus.main import RapidTableModel
 from ...model.table.rec.unet_table.main import UnetTableModel
@@ -26,6 +29,16 @@ elif MFR_MODEL.lower() in ['false', '0', 'no']:
 else:
     logger.warning(f"Invalid MINERU_FORMULA_CH_SUPPORT value: {MFR_MODEL}, set to default 'False'")
     MFR_MODEL = "unimernet_small"
+
+
+def chem_det_model_init(weight, device='cpu'):
+    if str(device).startswith('npu'):
+        device = torch.device(device)
+    return ChemDetModel(weight, device)
+
+
+def chem_recog_model_init(weight, device='cpu'):
+    return MolScribe(weight, device=device)
 
 
 def img_orientation_cls_model_init():
@@ -187,6 +200,16 @@ def atom_model_init(model_name: str, **kwargs):
         atom_model = table_cls_model_init()
     elif model_name == AtomicModel.ImgOrientationCls:
         atom_model = img_orientation_cls_model_init()
+    elif model_name == AtomicModel.ChemDet:
+        atom_model = chem_det_model_init(
+            kwargs.get('cfd_weights'),
+            kwargs.get('device')
+        )
+    elif model_name == AtomicModel.ChemRecog:
+        atom_model = chem_recog_model_init(
+            kwargs.get('cfr_weight_dir'),
+            kwargs.get('device')
+        )
     else:
         logger.error('model name not allow')
         exit(1)
@@ -204,6 +227,8 @@ class MineruPipelineModel:
         self.apply_formula = self.formula_config.get('enable', True)
         self.table_config = kwargs.get('table_config')
         self.apply_table = self.table_config.get('enable', True)
+        self.chem_config = kwargs.get('chem_config') or {}
+        self.apply_chem = self.chem_config.get('enable', False)
         self.lang = kwargs.get('lang', None)
         self.device = kwargs.get('device', 'cpu')
         logger.info(
@@ -233,6 +258,18 @@ class MineruPipelineModel:
             self.mfr_model = atom_model_manager.get_atom_model(
                 atom_model_name=AtomicModel.MFR,
                 mfr_weight_dir=str(os.path.join(auto_download_and_get_model_root_path(mfr_model_path), mfr_model_path)),
+                device=self.device,
+            )
+
+        if self.apply_chem:
+            self.chem_det_model = atom_model_manager.get_atom_model(
+                atom_model_name=AtomicModel.ChemDet,
+                cfd_weights=hf_hub_download('wynnnnnnn/chemdet', 'best.pt'),
+                device=self.device,
+            )
+            self.chem_recog_model = atom_model_manager.get_atom_model(
+                atom_model_name=AtomicModel.ChemRecog,
+                cfr_weight_dir=hf_hub_download('yujieq/MolScribe', 'swin_base_char_aux_1m680k.pth'),
                 device=self.device,
             )
 

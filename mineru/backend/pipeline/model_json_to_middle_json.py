@@ -6,7 +6,7 @@ from loguru import logger
 from tqdm import tqdm
 
 from mineru.backend.utils import cross_page_table_merge
-from mineru.utils.config_reader import get_device, get_llm_aided_config, get_formula_enable
+from mineru.utils.config_reader import get_chem_enable, get_device, get_llm_aided_config, get_formula_enable
 from mineru.backend.pipeline.model_init import AtomModelSingleton
 from mineru.backend.pipeline.para_split import para_split
 from mineru.utils.block_pre_proc import prepare_block_bboxes, process_groups
@@ -25,7 +25,7 @@ from mineru.version import __version__
 from mineru.utils.hash_utils import bytes_md5
 
 
-def page_model_info_to_page_info(page_model_info, image_dict, page, image_writer, page_index, ocr_enable=False, formula_enabled=True):
+def page_model_info_to_page_info(page_model_info, image_dict, page, image_writer, page_index, ocr_enable=False, formula_enabled=True, chem_enabled=False):
     scale = image_dict["scale"]
     page_pil_img = image_dict["img_pil"]
     # page_img_md5 = str_md5(image_dict["img_base64"])
@@ -38,6 +38,7 @@ def page_model_info_to_page_info(page_model_info, image_dict, page, image_writer
     text_blocks = magic_model.get_text_blocks()
     title_blocks = magic_model.get_title_blocks()
     inline_equations, interline_equations, interline_equation_blocks = magic_model.get_equations()
+    chemical_blocks = magic_model.get_chemical() if chem_enabled else []
 
     img_groups = magic_model.get_imgs()
     table_groups = magic_model.get_tables()
@@ -110,6 +111,7 @@ def page_model_info_to_page_info(page_model_info, image_dict, page, image_writer
             text_blocks,
             title_blocks,
             interline_equation_blocks,
+            chemical_blocks,
             page_w,
             page_h,
         )
@@ -121,6 +123,7 @@ def page_model_info_to_page_info(page_model_info, image_dict, page, image_writer
             text_blocks,
             title_blocks,
             interline_equations,
+            chemical_blocks,
             page_w,
             page_h,
         )
@@ -173,14 +176,15 @@ def page_model_info_to_page_info(page_model_info, image_dict, page, image_writer
     return page_info
 
 
-def result_to_middle_json(model_list, images_list, pdf_doc, image_writer, lang=None, ocr_enable=False, formula_enabled=True):
+def result_to_middle_json(model_list, images_list, pdf_doc, image_writer, lang=None, ocr_enable=False, formula_enabled=True, chem_enabled=False):
     middle_json = {"pdf_info": [], "_backend":"pipeline", "_version_name": __version__}
     formula_enabled = get_formula_enable(formula_enabled)
+    chem_enabled = get_chem_enable(chem_enabled)
     for page_index, page_model_info in tqdm(enumerate(model_list), total=len(model_list), desc="Processing pages"):
         page = pdf_doc[page_index]
         image_dict = images_list[page_index]
         page_info = page_model_info_to_page_info(
-            page_model_info, image_dict, page, image_writer, page_index, ocr_enable=ocr_enable, formula_enabled=formula_enabled
+            page_model_info, image_dict, page, image_writer, page_index, ocr_enable=ocr_enable, formula_enabled=formula_enabled, chem_enabled=chem_enabled
         )
         if page_info is None:
             page_w, page_h = map(int, page.get_size())

@@ -322,6 +322,7 @@ class MagicModel:
             CategoryId.InlineEquation,
             CategoryId.InterlineEquation_YOLO,
             CategoryId.OcrText,
+            CategoryId.ChemicalFormula,
         ]
         """当成span拼接的"""
         for layout_det in layout_dets:
@@ -348,8 +349,17 @@ class MagicModel:
                 elif category_id == CategoryId.OcrText:
                     span['content'] = layout_det['text']
                     span['type'] = ContentType.TEXT
+                elif category_id == CategoryId.ChemicalFormula:
+                    span['content'] = layout_det['text']
+                    span['type'] = ContentType.CHEMICAL_FORMULA
                 all_spans.append(span)
         return remove_duplicate_spans(all_spans)
+
+    def get_chemical(self) -> list:  # 化学结构块，有坐标，也有 SMILES 识别结果
+        blocks = self.__get_blocks_by_type(
+            CategoryId.ChemicalFormula, ['text']
+        )
+        return blocks
 
     def __get_blocks_by_type(
         self, category_type: int, extra_col=None
