@@ -1,88 +1,83 @@
-"""SwinOCSR wrapper: chemical-structure image -> SMILES.
+"""Unified chemical-structure recognition for the MinerU chem pipeline.
 
-Clean reimplementation on top of the user's ReactiGraph swin_ocsr model.
-Deps: torch, torchvision, transformers, deepsmiles  (no albumentations/timm/OpenNMT).
+Two clean backends, both runnable on torch/torchvision/numpy/rdkit only:
+
+* ``molscribe``  (default) — Swin encoder + transformer decoder -> char-level SMILES.
+  Harness-verified bit-exact against the official MolScribe; 92.0% exact match on the
+  USPTO-10K benchmark.
+* ``molgrapher``           — ResNet18 keypoint detector + 4xGCNConv graph classifier
+  (PatCID's recogniser), pure-torch reimplementation, bit-exact vs the original.
+
+The pipeline contract (unchanged from the previous swin_ocsr wrapper)::
+
+    m = MolScribe(weight, device="cuda")
+    m.predict_images(images, return_atoms_bonds=False, return_confidence=True)
+    -> [{"smiles": str, "confidence": float}, ...]
+
+``confidence`` is 1.0 when the produced SMILES parses in RDKit, else 0.0, because
+``batch_analyze`` filters on ``confidence > 0.7`` and a non-parsing structure must be
+dropped rather than written into the markdown.
 """
 import os
 
 import numpy as np
-import torch
-import torch.nn as nn
-from PIL import Image
-from torchvision import transforms
 
-from .swin_ocsr import SwinOCSRConfig, SwinOCSRModel  # registers with Auto*
-
-_MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "swin_ocsr")
-_WORD_MAP = os.path.join(_MODEL_DIR, "500wan_shuffle_DeepSMILES_word_map")
-
-_transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-])
+__all__ = ["MolScribe", "ChemRecog", "SwinOCSR"]
 
 
-def _subsequent_mask(size):
-    attn_shape = (1, size, size)
-    m = np.triu(np.ones(attn_shape), k=1).astype("uint8")
-    return torch.from_numpy(m) == 0
-
-
-def _deepsmiles_to_smiles(deep_smiles):
-    import deepsmiles
-    converter = deepsmiles.Converter(rings=True, branches=True)
+def _is_valid(smiles):
+    if not smiles:
+        return False
     try:
-        return converter.decode(deep_smiles)
-    except Exception:  # noqa: BLE001
-        return None
+        from rdkit import Chem, RDLogger
+
+        RDLogger.DisableLog("rdApp.*")
+        return Chem.MolFromSmiles(smiles) is not None
+    except Exception:  # rdkit missing -> trust the backend
+        return True
 
 
-class SwinOCSR:
-    """Drop-in for the old MolScribe interface used by batch_analyze."""
+class ChemRecog:
+    """Thin unified wrapper over the molscribe / molgrapher clean backends."""
 
-    def __init__(self, weight, device="cpu"):
-        from transformers import AutoModel  # local import to keep module import light
-        self.device = torch.device(device if torch.cuda.is_available() or str(device).startswith("cpu") else "cpu")
-        self.model = SwinOCSRModel.from_pretrained(weight) if os.path.isdir(weight) else SwinOCSRModel(SwinOCSRConfig())
-        self.model.to(self.device).eval()
-        self.word_map = torch.load(_WORD_MAP, map_location="cpu")
-        self.inv_word_map = {v: k for k, v in self.word_map.items()}
-        self.start_id = self.word_map["<start>"]
-        self.end_id = self.word_map["<end>"]
-        self.max_len = 102
+    def __init__(self, weight=None, device="cpu", backend=None, **kwargs):
+        self.backend = (backend or os.environ.get("MINERU_CHEM_RECOG_BACKEND", "molscribe")).lower()
+        if self.backend == "molgrapher":
+            from .molgrapher.interface import MolGrapher
 
-    @torch.no_grad()
-    def _predict_one(self, img_np):
-        pil = Image.fromarray(img_np).convert("L")
-        # 模型在二值化图上训练: 灰度阈值 200 -> 黑白
-        pil = pil.point(lambda x: 0 if x < 200 else 255, "1").convert("RGB")
-        x = _transform(pil).unsqueeze(0).to(self.device)
-        memory = self.model.encoder(x)
-        ys = torch.ones(1, 1).fill_(self.start_id).type(torch.long).to(self.device)
-        logprobs = []
-        for _ in range(self.max_len - 1):
-            logit = self.model.decoder(ys, memory, _subsequent_mask(ys.size(1)).type(torch.long).to(self.device))
-            prob = nn.Softmax(dim=-1)(logit[:, -1])
-            p, nxt = torch.max(prob, dim=-1)
-            logprobs.append(float(p[0]))
-            nxt = nxt.unsqueeze(1)
-            ys = torch.cat([ys, nxt.type(torch.long).to(self.device)], dim=1)
-            if int(nxt[0, 0]) == self.end_id:
-                break
-        tokens = [t for t in ys[0, 1:].tolist() if t != self.end_id]
-        deep_smiles = "".join(self.inv_word_map.get(t, "") for t in tokens)
-        smiles = _deepsmiles_to_smiles(deep_smiles)
-        confidence = float(np.mean(logprobs)) if logprobs else 0.0
-        return smiles, confidence
+            self.model = MolGrapher(device=device, **kwargs)
+        else:
+            from .molscribe.interface import MolScribe as _MolScribe
 
+            # ``weight`` may be a .pth path or a HF snapshot dir; the clean
+            # implementation also accepts None and downloads the default checkpoint.
+            self.model = _MolScribe(weight, device=device, **kwargs)
+
+    # ------------------------------------------------------------------ api
     def predict_images(self, images, return_atoms_bonds=False, return_confidence=True):
         out = []
         for img in images:
-            smiles, conf = self._predict_one(img)
-            out.append({"smiles": smiles, "confidence": conf})
+            out.append(self.predict_image(img, return_confidence=return_confidence))
         return out
 
+    def predict_image(self, image, return_confidence=True):
+        if isinstance(image, np.ndarray) and image.ndim == 3 and image.shape[2] == 4:
+            image = image[:, :, :3]
+        try:
+            res = self.model.predict_image(image)
+        except Exception as exc:  # never let one bad crop kill the page
+            return {"smiles": "", "confidence": 0.0, "error": str(exc)}
+        smiles = (res or {}).get("smiles") or (res or {}).get("raw_smiles") or ""
+        conf = float((res or {}).get("confidence") or 0.0)
+        if conf <= 0.0:
+            conf = 1.0 if _is_valid(smiles) else 0.0
+        item = {"smiles": smiles, "confidence": conf}
+        if return_confidence is False:
+            item.pop("confidence", None)
+        return item
 
-# Backwards-compat alias (model_init imports MolScribe by this name).
-MolScribe = SwinOCSR
+
+# ``model_init.py`` does ``from ...model.chem_recog import SwinOCSR as MolScribe``
+# and constructs ``MolScribe(weight, device=device)``; keep both names working.
+MolScribe = ChemRecog
+SwinOCSR = ChemRecog

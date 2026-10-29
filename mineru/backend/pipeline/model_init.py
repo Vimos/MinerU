@@ -269,7 +269,7 @@ class MineruPipelineModel:
             )
             self.chem_recog_model = atom_model_manager.get_atom_model(
                 atom_model_name=AtomicModel.ChemRecog,
-                cfr_weight_dir=snapshot_download('CAS-SIAT-XinHai/swin-ocsr-large-patch4-window7-224'),
+                cfr_weight_dir=hf_hub_download('yujieq/MolScribe', 'swin_base_char_aux_1m680k.pth'),
                 device=self.device,
             )
 
